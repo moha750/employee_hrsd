@@ -11,6 +11,11 @@
   if (hero && bar) {
     const stickyObserver = new IntersectionObserver(
       ([entry]) => {
+        // الترويسة بلا أبعاد (display:none/مخفية)؟ لا تُظهر الشريط
+        if (entry.boundingClientRect.height === 0) {
+          bar.classList.remove('is-visible');
+          return;
+        }
         bar.classList.toggle('is-visible', !entry.isIntersecting);
       },
       { rootMargin: '-40px 0px 0px 0px', threshold: 0 }

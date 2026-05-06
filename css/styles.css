@@ -210,6 +210,15 @@ body {
   z-index: 1;
 }
 
+.initiative-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
 .initiative-name {
   display: inline-block;
   font-size: 0.78rem;
@@ -222,13 +231,44 @@ body {
   border: 1px solid var(--color-teal-200);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-xs);
-  margin-bottom: var(--space-5);
+}
+
+.visitor-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-orange);
+  background: var(--color-white);
+  border: 1px solid var(--color-orange-100);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-xs);
+}
+
+.visitor-counter[hidden] { display: none; }
+
+.visitor-counter__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.visitor-counter__label {
+  letter-spacing: 0.5px;
+}
+
+.visitor-counter__value {
+  font-weight: 800;
+  color: var(--color-orange);
+  font-variant-numeric: tabular-nums;
 }
 
 .campaign-title {
   font-size: clamp(1.9rem, 4.2vw, 2.7rem);
   font-weight: 800;
-  color: var(--color-ink);
+  color: var(--color-teal-700);
   margin-bottom: var(--space-4);
   letter-spacing: -0.5px;
   line-height: 1.25;
@@ -259,6 +299,156 @@ body {
   max-width: 560px;
   margin: 0 auto;
   line-height: 1.7;
+}
+
+/* أزرار الإجراءات تحت الـ tagline */
+.header-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-6);
+}
+
+.header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 11px var(--space-5);
+  font-family: var(--font-family);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.4;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration) var(--ease-out),
+              background-color var(--duration) var(--ease-out),
+              filter var(--duration) var(--ease-out);
+}
+
+.header-action svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.header-action--primary {
+  background: linear-gradient(135deg, var(--color-teal) 0%, var(--color-teal-700) 100%);
+  color: var(--color-white);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 4px 10px -2px rgba(0, 170, 128, 0.35);
+}
+
+.header-action--primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 8px 18px -4px rgba(0, 170, 128, 0.45);
+}
+
+.header-action--ghost {
+  background: var(--color-white);
+  color: var(--color-teal-800);
+  /* الحدود عبر inset box-shadow بدل border حتى لا تؤثّر على الأبعاد */
+  box-shadow:
+    0 0 0 1.5px var(--color-teal-200) inset,
+    var(--shadow-xs);
+}
+
+.header-action--ghost:hover {
+  background: var(--color-teal-50);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1.5px var(--color-teal) inset,
+    var(--shadow-sm);
+}
+
+.header-action:active {
+  transform: translateY(0);
+}
+
+.header-action:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--color-white),
+    0 0 0 5px var(--color-teal);
+}
+
+@media (max-width: 540px) {
+  .header-nav {
+    margin-top: var(--space-5);
+    gap: var(--space-2);
+  }
+  .header-action {
+    padding: 10px var(--space-4);
+    font-size: 0.85rem;
+  }
+  .header-action svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Toast لرسائل المشاركة */
+.toast {
+  position: fixed;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translate(-50%, 80px);
+  z-index: 300;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 12px var(--space-5);
+  background: var(--color-ink);
+  color: var(--color-white);
+  border-radius: var(--radius-pill);
+  font-size: 0.92rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(15, 28, 26, 0.25);
+  opacity: 0;
+  transition: transform 0.4s var(--ease-spring),
+              opacity 0.3s var(--ease-out);
+  pointer-events: none;
+  max-width: calc(100vw - 40px);
+}
+
+.toast svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.toast.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.toast--success {
+  background: var(--color-teal-800);
+}
+
+.toast--success svg {
+  color: var(--color-yellow);
+}
+
+.toast--error {
+  background: var(--color-orange);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transition: opacity 0.2s linear;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ============================================================
@@ -910,18 +1100,91 @@ body {
   padding: 0 var(--space-5) var(--space-12);
 }
 
+/* حالة "مقفل": قبل تسجيل الدخول، نخفي كل شيء عدا شاشة الدخول والفوتر */
+body.is-locked .site-header,
+body.is-locked .sticky-bar,
+body.is-locked .admin-container {
+  display: none !important;
+}
+
+body.is-locked .login-screen {
+  min-height: calc(100vh - 120px); /* مساحة أكبر للتوسط، نطرح الفوتر فقط */
+}
+
+.login-screen {
+  min-height: calc(100vh - 220px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-5);
+  position: relative;
+}
+
+.login-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 280px at 30% 20%, rgba(0, 170, 128, 0.06), transparent 70%),
+    radial-gradient(circle 240px at 70% 80%, rgba(245, 156, 0, 0.05), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .login-card {
-  max-width: 440px;
-  margin: var(--space-16) auto;
+  width: 100%;
+  max-width: 420px;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+  padding: var(--space-12) var(--space-8) var(--space-10);
+}
+
+.login-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  background: linear-gradient(135deg, var(--color-teal-50) 0%, var(--color-orange-50) 100%);
+  border: 1px solid var(--color-teal-100);
+  border-radius: 50%;
+  color: var(--color-teal);
+  margin: 0 auto var(--space-4);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 8px 20px -6px rgba(0, 170, 128, 0.25);
+}
+
+.login-card__icon svg {
+  width: 30px;
+  height: 30px;
 }
 
 .login-card h2 {
   text-align: center;
   color: var(--color-ink);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-1);
   font-size: 1.55rem;
   font-weight: 800;
   letter-spacing: -0.3px;
+}
+
+.login-card__hint {
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin-bottom: var(--space-8);
+}
+
+@media (max-width: 540px) {
+  .login-screen {
+    min-height: calc(100vh - 180px);
+    padding: var(--space-6) var(--space-4);
+  }
+  .login-card {
+    padding: var(--space-8) var(--space-5) var(--space-6);
+  }
 }
 
 .admin-header {
@@ -945,8 +1208,8 @@ body {
 .btn-logout {
   padding: 10px var(--space-5);
   background: var(--color-white);
-  color: var(--color-orange);
-  border: 1.5px solid var(--color-orange-100);
+  color: #dc2626;
+  border: 1.5px solid #fecaca;
   border-radius: var(--radius-md);
   font-family: var(--font-family);
   font-size: 0.9rem;
@@ -956,11 +1219,35 @@ body {
 }
 
 .btn-logout:hover {
-  background: var(--color-orange);
-  border-color: var(--color-orange);
+  background: #dc2626;
+  border-color: #dc2626;
   color: var(--color-white);
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px -4px rgba(245, 156, 0, 0.40);
+  box-shadow: 0 6px 14px -4px rgba(220, 38, 38, 0.40);
+}
+
+.btn-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px var(--space-5);
+  background: linear-gradient(135deg, var(--color-teal) 0%, var(--color-teal-700) 100%);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease-out);
+  box-shadow: 0 4px 10px -2px rgba(0, 170, 128, 0.35);
+}
+
+.btn-home:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 8px 18px -4px rgba(0, 170, 128, 0.45);
 }
 
 .btn-export {
@@ -1266,9 +1553,22 @@ body {
 
 .nominations-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-6);
+}
+
+.nomination-card {
+  min-width: 0; /* يسمح للمحتوى الطويل بالانكماش بدل توسيع البطاقة */
+}
+
+.nom-card__org,
+.nom-card__leader-name,
+.nom-card__leader-title,
+.nom-card__emp-names {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .nomination-card {
@@ -1541,11 +1841,15 @@ body {
   z-index: 200;
   pointer-events: none;
   visibility: hidden;
+  /* تأخير إخفاء visibility حتى تُكمل transitions الإغلاق */
+  transition: visibility 0s linear var(--duration-slow);
 }
 
 .drawer.is-open {
   pointer-events: auto;
   visibility: visible;
+  /* عند الفتح، تظهر visibility فوراً قبل بدء transitions الفتح */
+  transition: visibility 0s linear 0s;
 }
 
 .drawer__backdrop {
@@ -1987,6 +2291,7 @@ body {
   .site-header,
   .site-footer,
   .submit-button,
+  .btn-home,
   .btn-logout,
   .btn-export {
     display: none;

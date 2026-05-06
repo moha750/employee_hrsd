@@ -91,7 +91,8 @@
   logoutBtn.addEventListener('click', async () => {
     await supabase.auth.signOut();
     dashboardSection.style.display = 'none';
-    loginSection.style.display = 'block';
+    loginSection.style.display = '';
+    document.body.classList.add('is-locked');
     loginForm.reset();
     loginBtn.disabled = false;
     loginBtn.textContent = 'دخول';
@@ -101,7 +102,12 @@
 
   function showDashboard() {
     loginSection.style.display = 'none';
-    dashboardSection.style.display = 'block';
+    dashboardSection.style.display = '';
+    document.body.classList.remove('is-locked');
+    // إعادة ضبط أي حالة عالقة قد تسبّب overlay
+    document.body.style.overflow = '';
+    document.querySelector('.sticky-bar')?.classList.remove('is-visible');
+    document.getElementById('drawer')?.classList.remove('is-open');
   }
 
   // ===== جلب الترشيحات =====
@@ -131,7 +137,7 @@
   }
 
   // ===== الإحصائيات =====
-  function renderStats(data) {
+  async function renderStats(data) {
     const totalNominations = data.length;
     const uniqueOrgs = new Set(data.map(d => d.organization)).size;
     const totalLeaders = data.filter(d => d.leader_name).length;
@@ -142,6 +148,8 @@
       if (d.employee_2) totalEmployees++;
       if (d.employee_3) totalEmployees++;
     });
+
+    const visitors = await fetchVisitorCount();
 
     statsGrid.innerHTML = `
       <div class="stat-card">
@@ -160,7 +168,21 @@
         <span class="stat-value">${totalEmployees}</span>
         <span class="stat-label">موظفون تم ترشيحهم</span>
       </div>
+      <div class="stat-card">
+        <span class="stat-value">${visitors === null ? '—' : visitors}</span>
+        <span class="stat-label">زوار الموقع</span>
+      </div>
     `;
+  }
+
+  async function fetchVisitorCount() {
+    const { data, error } = await supabase
+      .from('site_stats')
+      .select('value')
+      .eq('key', 'visitors')
+      .single();
+    if (error) return null;
+    return data.value;
   }
 
   // ===== ملء dropdown الجهات =====
