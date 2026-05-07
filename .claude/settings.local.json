@@ -13,7 +13,12 @@
       "Read(//tmp/**)",
       "Bash(awk -v block_file=/tmp/new_text_block.txt ' *)",
       "Bash(mv admin.html.new admin.html)",
-      "Bash(awk '/<svg/{s++} /<\\\\/svg>/{e++} END{print \"open:\",s,\"close:\",e}' admin.html)"
+      "Bash(awk '/<svg/{s++} /<\\\\/svg>/{e++} END{print \"open:\",s,\"close:\",e}' admin.html)",
+      "Bash(Select-String -Pattern \"text|tspan|الموارد|فرع|وزارة|البشرية\" -Context 2,2)",
+      "Bash(Select-Object -First 100)",
+      "PowerShell($tools = @\\('magick','inkscape','rsvg-convert','convert'\\); foreach \\($t in $tools\\) { $p = Get-Command $t -ErrorAction SilentlyContinue; if \\($p\\) { \"$t -> $\\($p.Source\\)\" } else { \"$t -> not found\" } })",
+      "Bash(git stash *)",
+      "Bash(git checkout *)"
     ]
   },
   "enableAllProjectMcpServers": true,
