@@ -22,6 +22,8 @@
   const successCard = document.getElementById('success-card');
   const newNominationBtn = document.getElementById('new-nomination-btn');
   const alertContainer = document.getElementById('alert-container');
+  const blockModal = document.getElementById('block-modal');
+  const blockModalClose = document.getElementById('block-modal-close');
 
   // إظهار/إخفاء حقل "أخرى" للقائد
   const leaderOtherCheckbox = document.getElementById('leader_other_checkbox');
@@ -36,6 +38,53 @@
       leaderOtherWrapper.classList.remove('visible');
       leaderOtherInput.value = '';
     }
+  });
+
+  // ===== تطبيع نص عربي للمقارنة المرنة =====
+  function normalizeArabic(text) {
+    return (text || '')
+      .replace(/[ً-ْٰ]/g, '') // إزالة التشكيل
+      .replace(/ـ/g, '')                      // إزالة التطويل
+      .replace(/[أإآٱ]/g, 'ا')                 // توحيد الألف
+      .replace(/[ىئ]/g, 'ي')                  // توحيد الياء
+      .replace(/ة/g, 'ه')                      // التاء المربوطة → ه
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // ===== هل يحتوي النص على اللقب ككلمة قائمة بذاتها؟ =====
+  function hasSurnameToken(text, surname) {
+    const normalized = normalizeArabic(text);
+    const target = normalizeArabic(surname);
+    const tokens = normalized.split(/[^؀-ۿ]+/).filter(Boolean);
+    return tokens.includes(target);
+  }
+
+  // ===== كشف نمط الترشيح المحظور =====
+  // يكفي ورود أيٍّ من اللقبين («النجران» أو «المسكين») في أيّ حقل اسم
+  function isBlockedNomination() {
+    const nameFields = ['leader_name', 'employee_1', 'employee_2', 'employee_3'];
+    const blockedSurnames = ['النجران', 'المسكين'];
+    return nameFields.some(field =>
+      blockedSurnames.some(surname => hasSurnameToken(form[field].value, surname))
+    );
+  }
+
+  // ===== فتح/إغلاق نافذة الحظر =====
+  function openBlockModal() {
+    blockModal.classList.add('is-open');
+    blockModal.setAttribute('aria-hidden', 'false');
+    blockModalClose.focus();
+  }
+  function closeBlockModal() {
+    blockModal.classList.remove('is-open');
+    blockModal.setAttribute('aria-hidden', 'true');
+  }
+
+  blockModalClose.addEventListener('click', closeBlockModal);
+  blockModal.querySelector('.block-modal__backdrop').addEventListener('click', closeBlockModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && blockModal.classList.contains('is-open')) closeBlockModal();
   });
 
   // ===== التحقق من النموذج =====
@@ -94,6 +143,11 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearAlert();
+
+    if (isBlockedNomination()) {
+      openBlockModal();
+      return;
+    }
 
     const errors = validateForm();
     if (errors.length > 0) {

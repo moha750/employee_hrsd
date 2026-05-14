@@ -758,6 +758,25 @@
       </div>
     </section>
 
+    <!-- نافذة الحظر — تظهر آلياً عند رصد ترشيح متكرر -->
+    <div id="block-modal" class="block-modal" aria-hidden="true" role="dialog" aria-labelledby="block-modal-title" aria-describedby="block-modal-body">
+      <div class="block-modal__backdrop" data-close></div>
+      <div class="block-modal__dialog" role="document">
+        <div class="block-modal__icon" aria-hidden="true">⚠️</div>
+        <h2 id="block-modal-title" class="block-modal__title">تنبيه آلي من النظام</h2>
+        <p id="block-modal-body" class="block-modal__body">
+          عزيزي <strong>المستخدم</strong>،<br>
+          رصد النظام محاولات ترشيح متكررة وغير قانونية للقائد <strong>محمد حمد النجران</strong>.
+          تم تسجيل جميع المحاولات وبصمة الجهاز ضمن سجلات المبادرة.
+          يُرجى التوقف فوراً عن تكرار هذا الترشيح، وإلا ستُحال جميع محاولاتك
+          إلى الجهة المختصة لاتخاذ الإجراء النظامي اللازم.
+        </p>
+        <button type="button" class="btn-secondary block-modal__close" id="block-modal-close">
+          تمّ الفهم
+        </button>
+      </div>
+    </div>
+
   </main>
 
   <footer class="site-footer">
