@@ -114,22 +114,34 @@
   async function loadNominations() {
     grid.innerHTML = '<div class="loading">جاري تحميل البيانات…</div>';
 
-    const { data, error } = await supabase
-      .from('nominations')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const PAGE_SIZE = 1000;
+    const all = [];
+    let from = 0;
 
-    if (error) {
-      grid.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">⚠️</div>
-          <div>حدث خطأ في تحميل البيانات: ${escapeHtml(error.message)}</div>
-        </div>
-      `;
-      return;
+    while (true) {
+      const { data, error } = await supabase
+        .from('nominations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <div>حدث خطأ في تحميل البيانات: ${escapeHtml(error.message)}</div>
+          </div>
+        `;
+        return;
+      }
+
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
     }
 
-    state.all = data || [];
+    state.all = all;
     populateOrgFilter(state.all);
     renderStats(state.all);
     toolbar.style.display = state.all.length > 0 ? '' : 'none';
