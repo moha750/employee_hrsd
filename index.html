@@ -535,8 +535,27 @@
 
   <main class="container">
 
-    <!-- بطاقة وصف النموذج -->
-    <section class="card">
+    <!-- بطاقة إغلاق فترة الترشيح -->
+    <section class="card success-card" id="closed-card">
+      <div class="success-icon" aria-hidden="true">⏱️</div>
+      <h2>انتهت فترة الترشيح</h2>
+      <p>
+        نشكر لكم تفاعلكم مع حملة <strong>"قدوة الانضباط"</strong>
+        ضمن مبادرة <strong>"نلتزم لنرتقي"</strong>.
+        لقد <strong>أُغلق باب استقبال الترشيحات</strong>،
+        ولن يتم قبول أي ترشيحات جديدة.
+      </p>
+      <p>
+        سيتم الإعلان عن النتائج لاحقاً وفق آلية المبادرة،
+        ومواءمتها مع بيانات الحضور والانصراف.
+      </p>
+      <div class="footer-quote">
+        بانضباطنا نصنع بيئة عمل أجمل… ونرتقي معًا
+      </div>
+    </section>
+
+    <!-- النموذج القديم — مُعطَّل بعد انتهاء فترة الترشيح -->
+    <section class="card" hidden aria-hidden="true">
       <div class="info-box">
         <h2>استبيان الترشيح</h2>
         <p>
@@ -795,7 +814,7 @@
   <!-- Supabase JS من CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
-  <script src="js/form.js"></script>
+  <!-- تم تعطيل js/form.js لانتهاء فترة الترشيح -->
   <script src="js/header.js"></script>
   <script src="js/share.js"></script>
   <script src="js/visitor-counter.js"></script>

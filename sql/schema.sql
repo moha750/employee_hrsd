@@ -43,12 +43,13 @@ alter table public.nominations enable row level security;
 drop policy if exists "anon_insert_nominations" on public.nominations;
 drop policy if exists "authenticated_select_nominations" on public.nominations;
 
--- سياسة: السماح للمستخدمين المجهولين بإدراج ترشيحات (لتقديم النموذج)
+-- سياسة: منع المستخدمين المجهولين من إدراج ترشيحات
+-- (انتهت فترة الترشيح — لإعادة فتح الترشيح غيِّر `with check (false)` إلى `with check (true)`)
 create policy "anon_insert_nominations"
   on public.nominations
   for insert
   to anon
-  with check (true);
+  with check (false);
 
 -- سياسة: السماح للمستخدمين المصادَق عليهم بقراءة الترشيحات (للوحة الإدارة)
 create policy "authenticated_select_nominations"
@@ -62,3 +63,33 @@ create policy "authenticated_select_nominations"
 -- البيانات لا تُعدَّل ولا تُحذف عبر التطبيق - فقط من خلال Dashboard
 -- إذا احتجت ذلك لاحقاً، أضف سياسات مناسبة هنا.
 -- ============================================================
+
+-- ============================================================
+-- إغلاق دالة الترشيح (submit_nomination) — انتهت فترة الترشيح
+-- ============================================================
+-- ملاحظة: إذا كانت دالة submit_nomination معرَّفة بـ SECURITY DEFINER
+-- فإنها تتجاوز سياسات RLS أعلاه. لذلك نسحب صلاحية التنفيذ من anon
+-- لضمان عدم قبول أي ترشيحات جديدة عبر RPC.
+-- لإعادة فتح الترشيح: امنح الصلاحية مجدداً بـ:
+--   grant execute on function public.submit_nomination(...) to anon;
+-- ============================================================
+
+do $$
+begin
+  if exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'submit_nomination'
+  ) then
+    execute (
+      select string_agg(
+        format('revoke execute on function %s from anon, public;',
+               p.oid::regprocedure),
+        E'\n'
+      )
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'submit_nomination'
+    );
+  end if;
+end$$;
