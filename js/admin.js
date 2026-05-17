@@ -166,23 +166,23 @@
     statsGrid.innerHTML = `
       <div class="stat-card">
         <span class="stat-value">${totalNominations}</span>
-        <span class="stat-label">إجمالي الترشيحات</span>
+        <span class="stat-label">إجمالي الترشيحات الواردة</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">${uniqueOrgs}</span>
-        <span class="stat-label">عدد الجهات المشاركة</span>
+        <span class="stat-value">48</span>
+        <span class="stat-label">عدد الجهات والإدارات المشاركة</span>
       </div>
       <div class="stat-card">
         <span class="stat-value">${totalLeaders}</span>
-        <span class="stat-label">قادة تم ترشيحهم</span>
+        <span class="stat-label">عدد مرات ترشيح القيادات ورؤساء الاقسام</span>
       </div>
       <div class="stat-card">
         <span class="stat-value">${totalEmployees}</span>
-        <span class="stat-label">موظفون تم ترشيحهم</span>
+        <span class="stat-label">عدد مرات ترشيح الموظفين</span>
       </div>
       <div class="stat-card">
         <span class="stat-value">${visitors === null ? '—' : visitors}</span>
-        <span class="stat-label">زوار الموقع</span>
+        <span class="stat-label">عدد زيارات الموقع</span>
       </div>
     `;
   }
