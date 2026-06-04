@@ -1,5 +1,6 @@
 -- ============================================================
--- مبادرة "نلتزم لنرتقي" - حملة "قدوة الانضباط"
+-- استبيان «الارتباط الوظيفي وفاعلية بيئة العمل»
+-- وزارة الموارد البشرية والتنمية الاجتماعية
 -- سكربت إنشاء قاعدة البيانات في Supabase
 -- ============================================================
 -- تعليمات التشغيل:
@@ -8,88 +9,172 @@
 -- 3. الصق هذا السكربت بالكامل واضغط Run
 -- ============================================================
 
--- جدول الترشيحات
-create table if not exists public.nominations (
+-- ============================================================
+-- جدول ردود الاستبيان
+-- ============================================================
+create table if not exists public.survey_responses (
   id uuid primary key default gen_random_uuid(),
-  created_at timestamptz default now(),
+  created_at timestamptz not null default now(),
 
-  -- معلومات الجهة
-  organization text not null,
+  -- بيانات عامة
+  organization     text not null,   -- الإدارة / جهة العمل (إلزامي)
+  job_title        text,            -- المسمى الوظيفي (اختياري)
+  years_experience text,            -- سنوات الخبرة (اختياري)
 
-  -- ترشيح القائد
-  leader_name text not null,
-  leader_title text not null,
-  leader_reasons text[] not null default '{}',
-  leader_other_reason text,
+  -- أولًا: الارتباط الوظيفي (5 عبارات، مقياس 1..5)
+  eng_1 smallint not null check (eng_1 between 1 and 5),
+  eng_2 smallint not null check (eng_2 between 1 and 5),
+  eng_3 smallint not null check (eng_3 between 1 and 5),
+  eng_4 smallint not null check (eng_4 between 1 and 5),
+  eng_5 smallint not null check (eng_5 between 1 and 5),
 
-  -- ترشيح الموظفين
-  employee_1 text,
-  employee_2 text,
-  employee_3 text,
-  employee_reasons text[] not null default '{}'
+  -- ثانيًا: بيئة العمل (6 عبارات، مقياس 1..5)
+  env_1 smallint not null check (env_1 between 1 and 5),
+  env_2 smallint not null check (env_2 between 1 and 5),
+  env_3 smallint not null check (env_3 between 1 and 5),
+  env_4 smallint not null check (env_4 between 1 and 5),
+  env_5 smallint not null check (env_5 between 1 and 5),
+  env_6 smallint not null check (env_6 between 1 and 5),
+
+  -- ثالثًا: الأثر والتحسين (4 عبارات، مقياس 1..5)
+  imp_1 smallint not null check (imp_1 between 1 and 5),
+  imp_2 smallint not null check (imp_2 between 1 and 5),
+  imp_3 smallint not null check (imp_3 between 1 and 5),
+  imp_4 smallint not null check (imp_4 between 1 and 5),
+
+  -- أسئلة مفتوحة (اختيارية)
+  positive_point          text,   -- أبرز نقطة إيجابية في بيئة العمل
+  improvement_opportunity text    -- أهم فرصة تحسين مقترحة
 );
 
--- فهرس على تاريخ الإنشاء لترتيب أسرع في لوحة الإدارة
-create index if not exists nominations_created_at_idx
-  on public.nominations (created_at desc);
+-- فهارس لتسريع لوحة الإدارة
+create index if not exists survey_responses_created_at_idx
+  on public.survey_responses (created_at desc);
+create index if not exists survey_responses_org_idx
+  on public.survey_responses (organization);
 
 -- ============================================================
 -- Row Level Security (RLS)
 -- ============================================================
+alter table public.survey_responses enable row level security;
 
-alter table public.nominations enable row level security;
-
--- حذف السياسات السابقة إن وُجدت (لإعادة التشغيل بأمان)
-drop policy if exists "anon_insert_nominations" on public.nominations;
-drop policy if exists "authenticated_select_nominations" on public.nominations;
-
--- سياسة: منع المستخدمين المجهولين من إدراج ترشيحات
--- (انتهت فترة الترشيح — لإعادة فتح الترشيح غيِّر `with check (false)` إلى `with check (true)`)
-create policy "anon_insert_nominations"
-  on public.nominations
-  for insert
-  to anon
-  with check (false);
-
--- سياسة: السماح للمستخدمين المصادَق عليهم بقراءة الترشيحات (للوحة الإدارة)
-create policy "authenticated_select_nominations"
-  on public.nominations
+-- قراءة الردود متاحة للمستخدمين المصادَق عليهم فقط (لوحة الإدارة)
+drop policy if exists "authenticated_select_survey" on public.survey_responses;
+create policy "authenticated_select_survey"
+  on public.survey_responses
   for select
   to authenticated
   using (true);
 
--- ============================================================
--- ملاحظة: لا توجد سياسة UPDATE/DELETE للمجهولين أو المصادقين
--- البيانات لا تُعدَّل ولا تُحذف عبر التطبيق - فقط من خلال Dashboard
--- إذا احتجت ذلك لاحقاً، أضف سياسات مناسبة هنا.
--- ============================================================
+-- لا يوجد إدراج/تعديل/حذف مباشر للمجهولين.
+-- الإدراج يتم حصراً عبر دالة submit_survey_response (SECURITY DEFINER) أدناه.
 
 -- ============================================================
--- إغلاق دالة الترشيح (submit_nomination) — انتهت فترة الترشيح
+-- دالة الإرسال الآمنة
+-- تتجاوز RLS عبر SECURITY DEFINER وتتحقق من صحة المدخلات
 -- ============================================================
--- ملاحظة: إذا كانت دالة submit_nomination معرَّفة بـ SECURITY DEFINER
--- فإنها تتجاوز سياسات RLS أعلاه. لذلك نسحب صلاحية التنفيذ من anon
--- لضمان عدم قبول أي ترشيحات جديدة عبر RPC.
--- لإعادة فتح الترشيح: امنح الصلاحية مجدداً بـ:
---   grant execute on function public.submit_nomination(...) to anon;
--- ============================================================
-
-do $$
+create or replace function public.submit_survey_response(
+  p_organization            text,
+  p_job_title               text       default null,
+  p_years_experience        text       default null,
+  p_eng                     integer[]  default '{}',   -- 5 تقييمات
+  p_env                     integer[]  default '{}',   -- 6 تقييمات
+  p_imp                     integer[]  default '{}',   -- 4 تقييمات
+  p_positive_point          text       default null,
+  p_improvement_opportunity text       default null
+) returns void
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v integer;
 begin
-  if exists (
-    select 1 from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname = 'submit_nomination'
-  ) then
-    execute (
-      select string_agg(
-        format('revoke execute on function %s from anon, public;',
-               p.oid::regprocedure),
-        E'\n'
-      )
-      from pg_proc p
-      join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.proname = 'submit_nomination'
-    );
+  -- تحقق من البيانات العامة
+  if p_organization is null or length(trim(p_organization)) = 0 then
+    raise exception 'organization is required' using errcode = '22023';
   end if;
-end$$;
+  if length(p_organization)                         > 200  then raise exception 'organization too long'    using errcode = '22001'; end if;
+  if length(coalesce(p_job_title,''))               > 200  then raise exception 'job_title too long'        using errcode = '22001'; end if;
+  if length(coalesce(p_years_experience,''))        > 100  then raise exception 'years_experience too long' using errcode = '22001'; end if;
+  if length(coalesce(p_positive_point,''))          > 2000 then raise exception 'positive_point too long'   using errcode = '22001'; end if;
+  if length(coalesce(p_improvement_opportunity,'')) > 2000 then raise exception 'improvement too long'      using errcode = '22001'; end if;
+
+  -- تحقق من اكتمال عدد التقييمات في كل قسم
+  if array_length(p_eng, 1) is distinct from 5 then raise exception 'engagement section requires 5 ratings'  using errcode = '22023'; end if;
+  if array_length(p_env, 1) is distinct from 6 then raise exception 'environment section requires 6 ratings' using errcode = '22023'; end if;
+  if array_length(p_imp, 1) is distinct from 4 then raise exception 'impact section requires 4 ratings'      using errcode = '22023'; end if;
+
+  -- تحقق من أن كل تقييم بين 1 و 5
+  foreach v in array (p_eng || p_env || p_imp) loop
+    if v is null or v < 1 or v > 5 then
+      raise exception 'rating values must be between 1 and 5' using errcode = '22023';
+    end if;
+  end loop;
+
+  insert into public.survey_responses (
+    organization, job_title, years_experience,
+    eng_1, eng_2, eng_3, eng_4, eng_5,
+    env_1, env_2, env_3, env_4, env_5, env_6,
+    imp_1, imp_2, imp_3, imp_4,
+    positive_point, improvement_opportunity
+  ) values (
+    trim(p_organization),
+    nullif(trim(coalesce(p_job_title,'')), ''),
+    nullif(trim(coalesce(p_years_experience,'')), ''),
+    p_eng[1], p_eng[2], p_eng[3], p_eng[4], p_eng[5],
+    p_env[1], p_env[2], p_env[3], p_env[4], p_env[5], p_env[6],
+    p_imp[1], p_imp[2], p_imp[3], p_imp[4],
+    nullif(trim(coalesce(p_positive_point,'')), ''),
+    nullif(trim(coalesce(p_improvement_opportunity,'')), '')
+  );
+end;
+$$;
+
+grant execute on function public.submit_survey_response(text, text, text, integer[], integer[], integer[], text, text)
+  to anon, authenticated;
+
+-- ============================================================
+-- عدّاد زوّار الموقع
+-- ============================================================
+create table if not exists public.site_stats (
+  key        text primary key,
+  value      bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.site_stats enable row level security;
+
+drop policy if exists "anon_select_site_stats" on public.site_stats;
+create policy "anon_select_site_stats"
+  on public.site_stats
+  for select
+  to anon, authenticated
+  using (true);
+
+create or replace function public.increment_visitor_count()
+returns bigint
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+declare
+  new_value bigint;
+begin
+  update public.site_stats
+     set value = value + 1,
+         updated_at = now()
+   where key = 'visitors'
+  returning value into new_value;
+
+  if new_value is null then
+    insert into public.site_stats (key, value)
+    values ('visitors', 1)
+    returning value into new_value;
+  end if;
+
+  return new_value;
+end;
+$$;
+
+grant execute on function public.increment_visitor_count() to anon, authenticated;

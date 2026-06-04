@@ -3,26 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة الإدارة - قدوة الانضباط</title>
+  <title>لوحة الإدارة - استبيان الارتباط الوظيفي وبيئة العمل</title>
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="لوحة إدارة الترشيحات - حملة قدوة الانضباط">
+  <meta name="description" content="لوحة إدارة ردود استبيان الارتباط الوظيفي وفاعلية بيئة العمل">
 
   <!-- Open Graph / فيسبوك / واتساب / تليجرام -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://moha750.github.io/employee_hrsd/admin.html">
-  <meta property="og:title" content="لوحة الإدارة - قدوة الانضباط">
-  <meta property="og:description" content="لوحة إدارة الترشيحات - حملة قدوة الانضباط">
+  <meta property="og:title" content="لوحة الإدارة - استبيان الارتباط الوظيفي وبيئة العمل">
+  <meta property="og:description" content="لوحة إدارة ردود استبيان الارتباط الوظيفي وفاعلية بيئة العمل">
   <meta property="og:image" content="https://moha750.github.io/employee_hrsd/assets/BG1.png">
   <meta property="og:image:secure_url" content="https://moha750.github.io/employee_hrsd/assets/BG1.png">
-  <meta property="og:image:alt" content="لوحة إدارة قدوة الانضباط">
+  <meta property="og:image:alt" content="لوحة إدارة الاستبيان">
   <meta property="og:locale" content="ar_SA">
 
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="لوحة الإدارة - قدوة الانضباط">
-  <meta name="twitter:description" content="لوحة إدارة الترشيحات - حملة قدوة الانضباط">
+  <meta name="twitter:title" content="لوحة الإدارة - استبيان الارتباط الوظيفي وبيئة العمل">
+  <meta name="twitter:description" content="لوحة إدارة ردود استبيان الارتباط الوظيفي وفاعلية بيئة العمل">
   <meta name="twitter:image" content="https://moha750.github.io/employee_hrsd/assets/BG1.png">
-  <meta name="twitter:image:alt" content="لوحة إدارة قدوة الانضباط">
+  <meta name="twitter:image:alt" content="لوحة إدارة الاستبيان">
 
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -33,7 +33,7 @@
   </div>
 
   <header class="site-header">
-    <svg class="site-logo" viewBox="0 0 728.8 491.5" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="شعار حملة قدوة الانضباط - مبادرة نلتزم لنرتقي">
+    <svg class="site-logo" viewBox="0 0 728.8 491.5" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="شعار حملة قدوة الانضباط - مبادرة تجربتي الوظيفية">
       <title>شعار قدوة الانضباط</title>
       <style>
         .site-logo .st0{fill:#158285;}
@@ -497,9 +497,9 @@
         c0,0.3-0.1,0.5-0.3,0.7C403.8,305.8,403.5,305.9,403.3,305.9z"/>
       </g>
     </svg>
-    <div class="initiative-name">مبادرة نلتزم لنرتقي</div>
+    <div class="initiative-name">مبادرة تجربتي الوظيفية</div>
     <h1 class="campaign-title">لوحة <span class="accent">الإدارة</span></h1>
-    <p class="campaign-tagline">عرض الترشيحات الواردة لحملة قدوة الانضباط</p>
+    <p class="campaign-tagline">عرض ردود استبيان الارتباط الوظيفي وفاعلية بيئة العمل</p>
   </header>
 
   <!-- ===== شاشة تسجيل الدخول (تخطيط مستقلّ ومركَّز) ===== -->
@@ -547,7 +547,7 @@
   <main class="admin-container" id="dashboard-section" style="display: none;">
 
     <div class="admin-header">
-      <h1>الترشيحات الواردة</h1>
+      <h1>ردود الاستبيان</h1>
       <div class="admin-header__actions">
         <a class="btn-home" href="index.html">الصفحة الرئيسية</a>
         <button class="btn-export" id="export-btn">تصدير كملف إكسل Excel</button>
@@ -565,7 +565,7 @@
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="search" id="search-input" placeholder="ابحث بالاسم، الجهة، المسمى الوظيفي…" aria-label="بحث في الترشيحات">
+        <input type="search" id="search-input" placeholder="ابحث بالجهة، المسمى الوظيفي، أو الإجابات…" aria-label="بحث في الردود">
       </label>
 
       <div class="toolbar-controls">
@@ -578,18 +578,19 @@
 
         <label class="toolbar-select">
           <span>الترتيب</span>
-          <select id="sort-by" aria-label="ترتيب الترشيحات">
+          <select id="sort-by" aria-label="ترتيب الردود">
             <option value="newest">الأحدث أولاً</option>
             <option value="oldest">الأقدم أولاً</option>
             <option value="org">حسب الجهة</option>
-            <option value="leader">حسب القائد</option>
+            <option value="avg_desc">الأعلى تقييماً</option>
+            <option value="avg_asc">الأقل تقييماً</option>
           </select>
         </label>
       </div>
 
       <div class="toolbar-meta" aria-live="polite">
         <strong id="result-count">0</strong>
-        <span>ترشيح</span>
+        <span>ردّ</span>
       </div>
     </div>
 
@@ -610,7 +611,7 @@
       <header class="drawer__header">
         <div class="drawer__head-content">
           <span class="drawer__org-pill" id="drawer-org">—</span>
-          <h2 class="drawer__title" id="drawer-title">تفاصيل الترشيح</h2>
+          <h2 class="drawer__title" id="drawer-title">تفاصيل الردّ</h2>
           <time class="drawer__date" id="drawer-date"></time>
         </div>
         <button class="drawer__close" id="drawer-close" aria-label="إغلاق التفاصيل">

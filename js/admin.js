@@ -1,5 +1,5 @@
 // ============================================================
-// منطق لوحة الإدارة
+// منطق لوحة الإدارة — استبيان الارتباط الوظيفي وفاعلية بيئة العمل
 // ============================================================
 
 (function () {
@@ -12,6 +12,61 @@
   }
 
   const supabase = window.supabase.createClient(config.url, config.anonKey);
+
+  // ===== تعريف أقسام التقييم وعباراتها =====
+  const SECTIONS = [
+    {
+      key: 'eng', title: 'الارتباط الوظيفي',
+      cols: ['eng_1', 'eng_2', 'eng_3', 'eng_4', 'eng_5'],
+      items: [
+        'أفهم كيف يسهم عملي في تحقيق أهداف الوزارة',
+        'أشعر بالحماس لتقديم أفضل أداء في عملي',
+        'توجد بيئة تشجع على المشاركة وإبداء الآراء',
+        'أشعر بالتقدير عند تقديم إنجازات أو مبادرات مميزة',
+        'يوجد تواصل فعّال بين الإدارة والموظفين'
+      ]
+    },
+    {
+      key: 'env', title: 'بيئة العمل',
+      cols: ['env_1', 'env_2', 'env_3', 'env_4', 'env_5', 'env_6'],
+      items: [
+        'بيئة العمل تساعدني على أداء مهامي بكفاءة',
+        'تتوفر الأدوات والأنظمة التي تساعد على إنجاز العمل',
+        'توجد روح تعاون إيجابية بين الزملاء',
+        'يتم التعامل مع التحديات والملاحظات بصورة فعالة',
+        'أشعر أن الفرع يهتم بتحسين تجربة الموظف',
+        'المبادرات والبرامج المنفذة تسهم في تحسين بيئة العمل'
+      ]
+    },
+    {
+      key: 'imp', title: 'الأثر والتحسين',
+      cols: ['imp_1', 'imp_2', 'imp_3', 'imp_4'],
+      items: [
+        'التحسينات والمبادرات انعكست إيجابًا على بيئة العمل',
+        'ألاحظ تطويرًا مستمرًا في أساليب العمل والخدمات',
+        'يتم الاستفادة من آراء الموظفين في تطوير بيئة العمل',
+        'رأيك في برامج الرفاه الوظيفي في بيئة العمل'
+      ]
+    }
+  ];
+  const ALL_COLS = SECTIONS.reduce((a, s) => a.concat(s.cols), []);
+  const SCALE = ['لا أوافق بشدة', 'لا أوافق', 'محايد', 'أوافق', 'أوافق بشدة'];
+
+  // ===== أدوات حسابية =====
+  function mean(nums) {
+    const vals = nums.filter(n => typeof n === 'number' && !isNaN(n));
+    if (vals.length === 0) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  function rowAvg(row) { return mean(ALL_COLS.map(c => row[c])); }
+  function sectionAvg(row, sec) { return mean(sec.cols.map(c => row[c])); }
+  function fmtScore(n) { return n === null || n === undefined ? '—' : n.toFixed(2); }
+  function scoreLevel(n) {
+    if (n === null || n === undefined) return 'na';
+    if (n >= 4) return 'high';
+    if (n >= 3) return 'mid';
+    return 'low';
+  }
 
   // عناصر DOM
   const loginSection      = document.getElementById('login-section');
@@ -55,7 +110,7 @@
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       showDashboard();
-      await loadNominations();
+      await loadResponses();
     }
   })();
 
@@ -84,7 +139,7 @@
     }
 
     showDashboard();
-    await loadNominations();
+    await loadResponses();
   });
 
   // ===== تسجيل الخروج =====
@@ -104,14 +159,13 @@
     loginSection.style.display = 'none';
     dashboardSection.style.display = '';
     document.body.classList.remove('is-locked');
-    // إعادة ضبط أي حالة عالقة قد تسبّب overlay
     document.body.style.overflow = '';
     document.querySelector('.sticky-bar')?.classList.remove('is-visible');
     document.getElementById('drawer')?.classList.remove('is-open');
   }
 
-  // ===== جلب الترشيحات =====
-  async function loadNominations() {
+  // ===== جلب الردود =====
+  async function loadResponses() {
     grid.innerHTML = '<div class="loading">جاري تحميل البيانات…</div>';
 
     const PAGE_SIZE = 1000;
@@ -120,7 +174,7 @@
 
     while (true) {
       const { data, error } = await supabase
-        .from('nominations')
+        .from('survey_responses')
         .select('*')
         .order('created_at', { ascending: false })
         .range(from, from + PAGE_SIZE - 1);
@@ -143,42 +197,47 @@
 
     state.all = all;
     populateOrgFilter(state.all);
-    renderStats(state.all);
+    await renderStats(state.all);
     toolbar.style.display = state.all.length > 0 ? '' : 'none';
     applyFiltersAndRender();
   }
 
   // ===== الإحصائيات =====
   async function renderStats(data) {
-    const totalNominations = data.length;
-    const uniqueOrgs = new Set(data.map(d => d.organization)).size;
-    const totalLeaders = data.filter(d => d.leader_name).length;
+    const total = data.length;
+    const uniqueOrgs = new Set(data.map(d => d.organization).filter(Boolean)).size;
 
-    let totalEmployees = 0;
-    data.forEach(d => {
-      if (d.employee_1) totalEmployees++;
-      if (d.employee_2) totalEmployees++;
-      if (d.employee_3) totalEmployees++;
-    });
+    const overall = mean(data.map(rowAvg).filter(v => v !== null));
+    const engAvg  = mean(data.map(d => sectionAvg(d, SECTIONS[0])).filter(v => v !== null));
+    const envAvg  = mean(data.map(d => sectionAvg(d, SECTIONS[1])).filter(v => v !== null));
+    const impAvg  = mean(data.map(d => sectionAvg(d, SECTIONS[2])).filter(v => v !== null));
 
     const visitors = await fetchVisitorCount();
 
     statsGrid.innerHTML = `
       <div class="stat-card">
-        <span class="stat-value">${totalNominations}</span>
-        <span class="stat-label">إجمالي الترشيحات الواردة</span>
+        <span class="stat-value">${total}</span>
+        <span class="stat-label">إجمالي الردود الواردة</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">48</span>
-        <span class="stat-label">عدد الجهات والإدارات المشاركة</span>
+        <span class="stat-value">${uniqueOrgs}</span>
+        <span class="stat-label">عدد الجهات المشاركة</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">${totalLeaders}</span>
-        <span class="stat-label">عدد مرات ترشيح القيادات ورؤساء الاقسام</span>
+        <span class="stat-value">${fmtScore(overall)}</span>
+        <span class="stat-label">متوسط التقييم العام (من 5)</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">${totalEmployees}</span>
-        <span class="stat-label">عدد مرات ترشيح الموظفين</span>
+        <span class="stat-value">${fmtScore(engAvg)}</span>
+        <span class="stat-label">متوسط الارتباط الوظيفي</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">${fmtScore(envAvg)}</span>
+        <span class="stat-label">متوسط بيئة العمل</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">${fmtScore(impAvg)}</span>
+        <span class="stat-label">متوسط الأثر والتحسين</span>
       </div>
       <div class="stat-card">
         <span class="stat-value">${visitors === null ? '—' : visitors}</span>
@@ -199,7 +258,7 @@
 
   // ===== ملء dropdown الجهات =====
   function populateOrgFilter(data) {
-    const orgs = Array.from(new Set(data.map(d => d.organization).filter(Boolean))).sort();
+    const orgs = Array.from(new Set(data.map(d => d.organization).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
     const current = filterOrgSelect.value;
     filterOrgSelect.innerHTML = '<option value="">كل الجهات</option>' +
       orgs.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
@@ -210,25 +269,21 @@
   function applyFiltersAndRender() {
     let result = [...state.all];
 
-    // بحث نصي
     if (state.search) {
       const q = state.search.toLowerCase();
       result = result.filter(r => {
         const fields = [
-          r.organization, r.leader_name, r.leader_title,
-          r.employee_1, r.employee_2, r.employee_3,
-          r.leader_other_reason
+          r.organization, r.job_title, r.years_experience,
+          r.positive_point, r.improvement_opportunity
         ];
         return fields.some(f => f && String(f).toLowerCase().includes(q));
       });
     }
 
-    // فلترة بالجهة
     if (state.orgFilter) {
       result = result.filter(r => r.organization === state.orgFilter);
     }
 
-    // ترتيب
     switch (state.sort) {
       case 'oldest':
         result.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -236,8 +291,11 @@
       case 'org':
         result.sort((a, b) => (a.organization || '').localeCompare(b.organization || '', 'ar'));
         break;
-      case 'leader':
-        result.sort((a, b) => (a.leader_name || '').localeCompare(b.leader_name || '', 'ar'));
+      case 'avg_desc':
+        result.sort((a, b) => (rowAvg(b) || 0) - (rowAvg(a) || 0));
+        break;
+      case 'avg_asc':
+        result.sort((a, b) => (rowAvg(a) || 0) - (rowAvg(b) || 0));
         break;
       default: // newest
         result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -245,7 +303,6 @@
 
     state.filtered = result;
 
-    // ضبط الصفحة الحالية لو خرجت عن النطاق
     const totalPages = Math.max(1, Math.ceil(result.length / state.perPage));
     if (state.page > totalPages) state.page = totalPages;
     if (state.page < 1) state.page = 1;
@@ -261,8 +318,8 @@
       const isFiltered = state.search || state.orgFilter;
       grid.innerHTML = `
         <div class="empty-state" style="grid-column: 1 / -1;">
-          <div class="empty-icon">${isFiltered ? '🔎' : '📋'}</div>
-          <div>${isFiltered ? 'لا توجد ترشيحات تطابق بحثك' : 'لا توجد ترشيحات حتى الآن'}</div>
+          <div class="empty-icon">${isFiltered}</div>
+          <div>${isFiltered ? 'لا توجد ردود تطابق بحثك' : 'لا توجد ردود حتى الآن'}</div>
         </div>
       `;
       return;
@@ -290,50 +347,31 @@
 
   function buildCard(row, idx) {
     const dateStr = formatRelativeDate(row.created_at);
-    const reasons = row.leader_reasons || [];
-    const visibleReasons = reasons.slice(0, 2);
-    const remainingReasons = reasons.length - visibleReasons.length;
-    const employees = [row.employee_1, row.employee_2, row.employee_3].filter(Boolean);
+    const avg = rowAvg(row);
+    const meta = [row.job_title, row.years_experience].filter(Boolean).join(' • ');
+    const hasText = row.positive_point || row.improvement_opportunity;
+
+    const chips = SECTIONS.map(sec => {
+      const v = sectionAvg(row, sec);
+      return `<span class="resp-chip">${escapeHtml(sec.title)} <b>${fmtScore(v)}</b></span>`;
+    }).join('');
 
     return `
-      <article class="nomination-card" role="button" tabindex="0" data-index="${idx}" aria-label="عرض تفاصيل ترشيح ${escapeHtml(row.leader_name || '')}">
+      <article class="nomination-card" role="button" tabindex="0" data-index="${idx}" aria-label="عرض تفاصيل ردّ ${escapeHtml(row.organization || '')}">
         <header class="nom-card__header">
           <div class="nom-card__org">${escapeHtml(row.organization || 'بدون جهة')}</div>
           <span class="nom-card__date">${escapeHtml(dateStr)}</span>
         </header>
 
-        <div class="nom-card__section">
-          <div class="nom-card__section-label">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
-            القائد المرشح
-          </div>
-          <div class="nom-card__leader-name">${escapeHtml(row.leader_name || '—')}</div>
-          ${row.leader_title ? `<div class="nom-card__leader-title">${escapeHtml(row.leader_title)}</div>` : ''}
-          ${reasons.length > 0 ? `
-            <div class="nom-card__chips">
-              ${visibleReasons.map(r => `<span class="nom-card__chip">${escapeHtml(r)}</span>`).join('')}
-              ${remainingReasons > 0 ? `<span class="nom-card__chip nom-card__chip--more">+${remainingReasons}</span>` : ''}
-            </div>
-          ` : ''}
+        <div class="resp-card__score">
+          <span class="score-badge score-badge--${scoreLevel(avg)}">${fmtScore(avg)}</span>
+          <span class="resp-card__score-label">متوسط التقييم العام<br>من 5</span>
         </div>
 
         <div class="nom-card__section">
-          <div class="nom-card__section-label">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            الموظفون المرشحون
-          </div>
-          <div class="nom-card__employees">
-            <span class="nom-card__emp-count">${employees.length}</span>
-            <span class="nom-card__emp-names">${employees.length > 0 ? escapeHtml(employees.join('، ')) : 'لا يوجد'}</span>
-          </div>
+          <div class="resp-card__chips">${chips}</div>
+          ${meta ? `<div class="resp-card__meta">${escapeHtml(meta)}</div>` : ''}
+          ${hasText ? `<div class="resp-card__hastext">✍️ يحتوي إجابات مكتوبة</div>` : ''}
         </div>
 
         <div class="nom-card__footer">
@@ -362,7 +400,7 @@
     const end = Math.min(cur * state.perPage, total);
 
     let pages = [];
-    const range = 1; // ±1 من الصفحة الحالية
+    const range = 1;
     pages.push(1);
     for (let i = cur - range; i <= cur + range; i++) {
       if (i > 1 && i < totalPages) pages.push(i);
@@ -396,7 +434,6 @@
         else if (action === 'next') state.page = Math.min(totalPages, cur + 1);
         else if (page) state.page = parseInt(page, 10);
         applyFiltersAndRender();
-        // التمرير لأعلى الشبكة برفق
         grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
@@ -408,71 +445,66 @@
     lastFocusedCard = sourceCard || null;
 
     drawerOrg.textContent = row.organization || 'بدون جهة';
-    drawerTitle.textContent = row.leader_name || 'ترشيح';
+    drawerTitle.textContent = `متوسط التقييم: ${fmtScore(rowAvg(row))} من 5`;
     drawerDate.textContent = formatFullDate(row.created_at);
 
-    const employees = [row.employee_1, row.employee_2, row.employee_3].filter(Boolean);
-    const leaderReasons = row.leader_reasons || [];
-    const employeeReasons = row.employee_reasons || [];
-
-    drawerBody.innerHTML = `
+    const general = `
       <section class="drawer-section">
         <h3 class="drawer-section__title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+            <path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>
           </svg>
-          القائد القدوة
+          بيانات عامة
         </h3>
         <div class="person-card">
-          <div class="person-card__name">${escapeHtml(row.leader_name || '—')}</div>
-          ${row.leader_title ? `<div class="person-card__title">${escapeHtml(row.leader_title)}</div>` : ''}
+          <div class="person-card__name">${escapeHtml(row.organization || '—')}</div>
+          ${row.job_title ? `<div class="person-card__title">المسمى الوظيفي: ${escapeHtml(row.job_title)}</div>` : ''}
+          ${row.years_experience ? `<div class="person-card__title">سنوات الخبرة: ${escapeHtml(row.years_experience)}</div>` : ''}
         </div>
-        ${leaderReasons.length > 0 ? `
-          <div class="drawer-chips">
-            ${leaderReasons.map(r => `
-              <span class="drawer-chip">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                ${escapeHtml(r)}
-              </span>
-            `).join('')}
-          </div>
-        ` : ''}
-        ${row.leader_other_reason ? `<div class="drawer-quote">${escapeHtml(row.leader_other_reason)}</div>` : ''}
       </section>
+    `;
 
+    const sectionsHtml = SECTIONS.map(sec => {
+      const avg = sectionAvg(row, sec);
+      const rows = sec.items.map((label, i) => {
+        const v = row[sec.cols[i]];
+        const lvl = scoreLevel(v);
+        return `
+          <div class="rating-readout">
+            <span class="rating-readout__text">${escapeHtml(label)}</span>
+            <span class="rating-readout__meta">
+              <span class="rating-readout__scale">${v ? escapeHtml(SCALE[v - 1]) : '—'}</span>
+              <span class="score-badge score-badge--${lvl} score-badge--sm">${v ?? '—'}</span>
+            </span>
+          </div>
+        `;
+      }).join('');
+      return `
+        <section class="drawer-section">
+          <h3 class="drawer-section__title">
+            <span class="drawer-section__avg">${fmtScore(avg)}</span>
+            ${escapeHtml(sec.title)}
+          </h3>
+          ${rows}
+        </section>
+      `;
+    }).join('');
+
+    const hasText = row.positive_point || row.improvement_opportunity;
+    const textHtml = hasText ? `
       <section class="drawer-section">
         <h3 class="drawer-section__title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
           </svg>
-          الموظفون القدوة (${employees.length})
+          إجابات مكتوبة
         </h3>
-        ${employees.length > 0 ? employees.map((name, i) => `
-          <div class="person-card">
-            <span class="person-card__num">${i + 1}</span>
-            <div class="person-card__name">${escapeHtml(name)}</div>
-          </div>
-        `).join('') : '<div style="color:var(--color-muted); font-size:0.9rem;">لا يوجد موظفون مرشحون.</div>'}
-        ${employeeReasons.length > 0 ? `
-          <div class="drawer-chips" style="margin-top: var(--space-2);">
-            ${employeeReasons.map(r => `
-              <span class="drawer-chip">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                ${escapeHtml(r)}
-              </span>
-            `).join('')}
-          </div>
-        ` : ''}
+        ${row.positive_point ? `<div class="drawer-qa"><div class="drawer-qa__q">أبرز نقطة إيجابية في بيئة العمل:</div><div class="drawer-quote">${escapeHtml(row.positive_point)}</div></div>` : ''}
+        ${row.improvement_opportunity ? `<div class="drawer-qa"><div class="drawer-qa__q">أهم فرصة تحسين مقترحة:</div><div class="drawer-quote">${escapeHtml(row.improvement_opportunity)}</div></div>` : ''}
       </section>
-    `;
+    ` : '';
+
+    drawerBody.innerHTML = general + sectionsHtml + textHtml;
 
     drawer.classList.add('is-open');
     drawer.setAttribute('aria-hidden', 'false');
@@ -548,7 +580,7 @@
     });
   }
 
-  // ===== تصدير CSV =====
+  // ===== تصدير CSV (يفتح في إكسل) =====
   exportBtn.addEventListener('click', () => {
     const dataToExport = state.filtered.length > 0 ? state.filtered : state.all;
     if (dataToExport.length === 0) {
@@ -556,31 +588,21 @@
       return;
     }
 
-    const headers = [
-      'التاريخ',
-      'الجهة',
-      'اسم القائد',
-      'المسمى الوظيفي',
-      'أسباب ترشيح القائد',
-      'سبب آخر للقائد',
-      'الموظف الأول',
-      'الموظف الثاني',
-      'الموظف الثالث',
-      'أسباب ترشيح الموظفين'
-    ];
+    const headers = ['التاريخ', 'الجهة', 'المسمى الوظيفي', 'سنوات الخبرة'];
+    SECTIONS.forEach(sec => sec.items.forEach(label => headers.push(`[${sec.title}] ${label}`)));
+    headers.push('أبرز نقطة إيجابية', 'أهم فرصة تحسين', 'المتوسط العام');
 
-    const rows = dataToExport.map(r => [
-      new Date(r.created_at).toLocaleString('ar-SA'),
-      r.organization || '',
-      r.leader_name || '',
-      r.leader_title || '',
-      (r.leader_reasons || []).join(' | '),
-      r.leader_other_reason || '',
-      r.employee_1 || '',
-      r.employee_2 || '',
-      r.employee_3 || '',
-      (r.employee_reasons || []).join(' | ')
-    ]);
+    const rows = dataToExport.map(r => {
+      const base = [
+        new Date(r.created_at).toLocaleString('ar-SA'),
+        r.organization || '',
+        r.job_title || '',
+        r.years_experience || ''
+      ];
+      ALL_COLS.forEach(c => base.push(r[c] ?? ''));
+      base.push(r.positive_point || '', r.improvement_opportunity || '', fmtScore(rowAvg(r)));
+      return base;
+    });
 
     const csv = [headers, ...rows]
       .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
@@ -590,7 +612,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `nominations-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `survey-responses-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -1,5 +1,5 @@
 // ============================================================
-// منطق نموذج الترشيح
+// منطق استبيان «الارتباط الوظيفي وفاعلية بيئة العمل»
 // ============================================================
 
 (function () {
@@ -9,7 +9,8 @@
   const config = window.SUPABASE_CONFIG;
   if (!config || !config.url || config.url.includes('YOUR_PROJECT_ID')) {
     showAlert('error', 'لم يتم إعداد الاتصال بقاعدة البيانات. يرجى إعداد ملف js/config.js');
-    document.getElementById('submit-btn').disabled = true;
+    const b = document.getElementById('submit-btn');
+    if (b) b.disabled = true;
     return;
   }
 
@@ -17,115 +18,77 @@
   const supabase = window.supabase.createClient(config.url, config.anonKey);
 
   // عناصر DOM
-  const form = document.getElementById('nomination-form');
-  const submitBtn = document.getElementById('submit-btn');
-  const successCard = document.getElementById('success-card');
-  const newNominationBtn = document.getElementById('new-nomination-btn');
-  const alertContainer = document.getElementById('alert-container');
-  const blockModal = document.getElementById('block-modal');
-  const blockModalClose = document.getElementById('block-modal-close');
+  const form           = document.getElementById('survey-form');
+  const submitBtn      = document.getElementById('submit-btn');
+  const successCard    = document.getElementById('success-card');
+  const newResponseBtn = document.getElementById('new-response-btn');
 
-  // إظهار/إخفاء حقل "أخرى" للقائد
-  const leaderOtherCheckbox = document.getElementById('leader_other_checkbox');
-  const leaderOtherWrapper = document.getElementById('leader_other_wrapper');
-  const leaderOtherInput = document.getElementById('leader_other_reason');
+  // مجموعات التقييم (الإلزامية) بالترتيب
+  const ENG = ['eng_1', 'eng_2', 'eng_3', 'eng_4', 'eng_5'];
+  const ENV = ['env_1', 'env_2', 'env_3', 'env_4', 'env_5', 'env_6'];
+  const IMP = ['imp_1', 'imp_2', 'imp_3', 'imp_4'];
+  const RATING_GROUPS = [...ENG, ...ENV, ...IMP];
 
-  leaderOtherCheckbox.addEventListener('change', () => {
-    if (leaderOtherCheckbox.checked) {
-      leaderOtherWrapper.classList.add('visible');
-      leaderOtherInput.focus();
-    } else {
-      leaderOtherWrapper.classList.remove('visible');
-      leaderOtherInput.value = '';
+  // ===== الحصول على قيمة تقييم مختار =====
+  function getRating(name) {
+    const el = form.querySelector(`input[name="${name}"]:checked`);
+    return el ? parseInt(el.value, 10) : null;
+  }
+
+  // ===== إدارة حالة الخطأ البصرية =====
+  function clearInvalid() {
+    form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  }
+
+  function markRatingInvalid(name) {
+    const input = form.querySelector(`input[name="${name}"]`);
+    const item = input ? input.closest('.rating-item') : null;
+    if (item) item.classList.add('is-invalid');
+    return item;
+  }
+
+  // إزالة علامة الخطأ فور اختيار المستخدم تقييماً
+  form.addEventListener('change', (e) => {
+    if (e.target && e.target.matches('input[type="radio"]')) {
+      const item = e.target.closest('.rating-item');
+      if (item) item.classList.remove('is-invalid');
     }
-  });
-
-  // ===== تطبيع نص عربي للمقارنة المرنة =====
-  function normalizeArabic(text) {
-    return (text || '')
-      .replace(/[ً-ْٰ]/g, '') // إزالة التشكيل
-      .replace(/ـ/g, '')                      // إزالة التطويل
-      .replace(/[أإآٱ]/g, 'ا')                 // توحيد الألف
-      .replace(/[ىئ]/g, 'ي')                  // توحيد الياء
-      .replace(/ة/g, 'ه')                      // التاء المربوطة → ه
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  // ===== هل يحتوي النص على اللقب ككلمة قائمة بذاتها؟ =====
-  function hasSurnameToken(text, surname) {
-    const normalized = normalizeArabic(text);
-    const target = normalizeArabic(surname);
-    const tokens = normalized.split(/[^؀-ۿ]+/).filter(Boolean);
-    return tokens.includes(target);
-  }
-
-  // ===== كشف نمط الترشيح المحظور =====
-  // يكفي ورود أيٍّ من اللقبين («النجران» أو «المسكين») في أيّ حقل اسم
-  function isBlockedNomination() {
-    const nameFields = ['leader_name', 'employee_1', 'employee_2', 'employee_3'];
-    const blockedSurnames = ['النجران', 'المسكين'];
-    return nameFields.some(field =>
-      blockedSurnames.some(surname => hasSurnameToken(form[field].value, surname))
-    );
-  }
-
-  // ===== فتح/إغلاق نافذة الحظر =====
-  function openBlockModal() {
-    blockModal.classList.add('is-open');
-    blockModal.setAttribute('aria-hidden', 'false');
-    blockModalClose.focus();
-  }
-  function closeBlockModal() {
-    blockModal.classList.remove('is-open');
-    blockModal.setAttribute('aria-hidden', 'true');
-  }
-
-  blockModalClose.addEventListener('click', closeBlockModal);
-  blockModal.querySelector('.block-modal__backdrop').addEventListener('click', closeBlockModal);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && blockModal.classList.contains('is-open')) closeBlockModal();
+    if (e.target === form.organization) {
+      const g = form.organization.closest('.form-group');
+      if (g) g.classList.remove('is-invalid');
+    }
   });
 
   // ===== التحقق من النموذج =====
   function validateForm() {
-    const errors = [];
+    clearInvalid();
 
-    const organization = form.organization.value.trim();
-    if (!organization) errors.push('يرجى إدخال اسم الجهة / الإدارة / الفرع');
-
-    const leaderName = form.leader_name.value.trim();
-    if (!leaderName) errors.push('يرجى إدخال اسم المرشح للقيادة');
-
-    const leaderTitle = form.leader_title.value.trim();
-    if (!leaderTitle) errors.push('يرجى إدخال المسمى الوظيفي للقائد');
-
-    const leaderReasons = getCheckedValues('leader_reasons');
-    if (leaderReasons.length === 0) {
-      errors.push('يرجى اختيار سبب واحد على الأقل لترشيح القائد');
+    // الجهة (إلزامي)
+    if (!form.organization.value) {
+      const g = form.organization.closest('.form-group');
+      if (g) g.classList.add('is-invalid');
+      return { ok: false, message: 'يرجى اختيار الإدارة / جهة العمل', focus: form.organization };
     }
 
-    // إذا اختار "أخرى" يجب توضيح السبب
-    if (leaderReasons.includes('أخرى') && !leaderOtherInput.value.trim()) {
-      errors.push('يرجى توضيح "السبب الآخر" لترشيح القائد');
+    // جميع عبارات التقييم (إلزامية)
+    for (const name of RATING_GROUPS) {
+      if (getRating(name) === null) {
+        const item = markRatingInvalid(name);
+        return {
+          ok: false,
+          message: 'يرجى الإجابة على جميع عبارات التقييم قبل الإرسال',
+          focus: item
+        };
+      }
     }
 
-    const employeeReasons = getCheckedValues('employee_reasons');
-    if (employeeReasons.length === 0) {
-      errors.push('يرجى اختيار سبب واحد على الأقل لترشيح الموظفين');
-    }
-
-    return errors;
-  }
-
-  // الحصول على القيم المختارة من مجموعة checkbox
-  function getCheckedValues(name) {
-    const checked = form.querySelectorAll(`input[name="${name}"]:checked`);
-    return Array.from(checked).map(cb => cb.value);
+    return { ok: true };
   }
 
   // ===== عرض رسالة تنبيه =====
   function showAlert(type, message) {
+    const alertContainer = document.getElementById('alert-container');
+    if (!alertContainer) return;
     alertContainer.innerHTML = `
       <div class="alert alert-${type}">
         <span>${type === 'error' ? '⚠️' : '✓'}</span>
@@ -136,7 +99,8 @@
   }
 
   function clearAlert() {
-    alertContainer.innerHTML = '';
+    const alertContainer = document.getElementById('alert-container');
+    if (alertContainer) alertContainer.innerHTML = '';
   }
 
   // ===== إرسال النموذج =====
@@ -144,40 +108,34 @@
     e.preventDefault();
     clearAlert();
 
-    if (isBlockedNomination()) {
-      openBlockModal();
-      return;
-    }
-
-    const errors = validateForm();
-    if (errors.length > 0) {
-      showAlert('error', errors[0]);
+    const result = validateForm();
+    if (!result.ok) {
+      showAlert('error', result.message);
+      if (result.focus) {
+        if (result.focus.scrollIntoView) {
+          result.focus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        try { result.focus.focus({ preventScroll: true }); } catch (_) {}
+      }
       return;
     }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'جاري الإرسال…';
 
-    const leaderReasons = getCheckedValues('leader_reasons');
-    const employeeReasons = getCheckedValues('employee_reasons');
-
     const payload = {
-      p_organization: form.organization.value.trim(),
-      p_leader_name: form.leader_name.value.trim(),
-      p_leader_title: form.leader_title.value.trim(),
-      p_leader_reasons: leaderReasons,
-      p_leader_other_reason: leaderReasons.includes('أخرى')
-        ? leaderOtherInput.value.trim()
-        : null,
-      p_employee_1: form.employee_1.value.trim() || null,
-      p_employee_2: form.employee_2.value.trim() || null,
-      p_employee_3: form.employee_3.value.trim() || null,
-      p_employee_reasons: employeeReasons
+      p_organization: form.organization.value,
+      p_job_title: form.job_title.value.trim() || null,
+      p_years_experience: form.years_experience.value.trim() || null,
+      p_eng: ENG.map(getRating),
+      p_env: ENV.map(getRating),
+      p_imp: IMP.map(getRating),
+      p_positive_point: form.positive_point.value.trim() || null,
+      p_improvement_opportunity: form.improvement_opportunity.value.trim() || null
     };
 
     try {
-      const { error } = await supabase.rpc('submit_nomination', payload);
-
+      const { error } = await supabase.rpc('submit_survey_response', payload);
       if (error) throw error;
 
       // نجاح: إخفاء النموذج وإظهار بطاقة الشكر
@@ -185,25 +143,24 @@
       successCard.style.display = 'block';
       successCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       form.reset();
-      leaderOtherWrapper.classList.remove('visible');
 
     } catch (err) {
-      console.error('خطأ في إرسال الترشيح:', err);
+      console.error('خطأ في إرسال الاستبيان:', err);
       showAlert(
         'error',
-        'تعذر إرسال الترشيح. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.'
+        'تعذر إرسال الاستبيان. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.'
       );
       submitBtn.disabled = false;
-      submitBtn.textContent = 'إرسال الترشيح';
+      submitBtn.textContent = 'إرسال الاستبيان';
     }
   });
 
-  // زر "تقديم ترشيح آخر"
-  newNominationBtn.addEventListener('click', () => {
+  // زر "تعبئة استبيان آخر"
+  newResponseBtn.addEventListener('click', () => {
     successCard.style.display = 'none';
     form.closest('.card').style.display = 'block';
     submitBtn.disabled = false;
-    submitBtn.textContent = 'إرسال الترشيح';
+    submitBtn.textContent = 'إرسال الاستبيان';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
