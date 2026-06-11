@@ -625,6 +625,63 @@
     </div>
   </aside>
 
+  <!-- ===== نافذة خيارات التصدير ===== -->
+  <div class="export-modal" id="export-modal" aria-hidden="true">
+    <div class="export-modal__backdrop" id="export-modal-backdrop"></div>
+    <div class="export-modal__panel" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
+      <header class="export-modal__header">
+        <div>
+          <h2 class="export-modal__title" id="export-modal-title">تصدير البيانات</h2>
+          <p class="export-modal__subtitle">اختر نطاق البيانات التي تريد تصديرها إلى ملف إكسل</p>
+        </div>
+        <button class="export-modal__close" id="export-modal-close" aria-label="إغلاق">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </header>
+
+      <div class="export-modal__body">
+        <!-- خيار النطاق -->
+        <div class="export-scope">
+          <label class="export-scope__option">
+            <input type="radio" name="export-scope" value="all" checked>
+            <span class="export-scope__card">
+              <span class="export-scope__label">كل الجهات</span>
+              <span class="export-scope__hint">تصدير جميع الردود المتاحة</span>
+            </span>
+          </label>
+          <label class="export-scope__option">
+            <input type="radio" name="export-scope" value="selected">
+            <span class="export-scope__card">
+              <span class="export-scope__label">جهات محددة</span>
+              <span class="export-scope__hint">اختر جهة أو أكثر من القائمة</span>
+            </span>
+          </label>
+        </div>
+
+        <!-- قائمة الجهات (تظهر عند اختيار "جهات محددة") -->
+        <div class="export-orgs" id="export-orgs" hidden>
+          <div class="export-orgs__toolbar">
+            <input type="search" id="export-orgs-search" class="export-orgs__search" placeholder="ابحث عن جهة…" aria-label="بحث في الجهات">
+            <div class="export-orgs__actions">
+              <button type="button" class="export-orgs__select-all" id="export-orgs-all">تحديد الكل</button>
+              <button type="button" class="export-orgs__clear" id="export-orgs-none">إلغاء التحديد</button>
+            </div>
+          </div>
+          <div class="export-orgs__list" id="export-orgs-list"></div>
+          <div class="export-orgs__count" id="export-orgs-count">لم يتم تحديد أي جهة</div>
+        </div>
+      </div>
+
+      <footer class="export-modal__footer">
+        <button type="button" class="export-modal__cancel" id="export-cancel">إلغاء</button>
+        <button type="button" class="export-modal__confirm" id="export-confirm">تصدير الآن</button>
+      </footer>
+    </div>
+  </div>
+
   <footer class="site-footer">
     <div class="footer-line">فريق <span class="team-name">نصنع جونا</span> — الرفاه الوظيفي ٢٠٢٦</div>
     <div class="footer-credit">
@@ -639,6 +696,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="js/config.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/header.js"></script>

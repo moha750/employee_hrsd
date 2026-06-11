@@ -92,6 +92,19 @@
   const drawerDate        = document.getElementById('drawer-date');
   const drawerBody        = document.getElementById('drawer-body');
 
+  // عناصر نافذة التصدير
+  const exportModal        = document.getElementById('export-modal');
+  const exportModalBackdrop= document.getElementById('export-modal-backdrop');
+  const exportModalClose   = document.getElementById('export-modal-close');
+  const exportCancelBtn    = document.getElementById('export-cancel');
+  const exportConfirmBtn   = document.getElementById('export-confirm');
+  const exportOrgsWrap     = document.getElementById('export-orgs');
+  const exportOrgsList     = document.getElementById('export-orgs-list');
+  const exportOrgsSearch   = document.getElementById('export-orgs-search');
+  const exportOrgsCount    = document.getElementById('export-orgs-count');
+  const exportOrgsAllBtn   = document.getElementById('export-orgs-all');
+  const exportOrgsNoneBtn  = document.getElementById('export-orgs-none');
+
   // الحالة العامة
   const state = {
     all: [],
@@ -581,13 +594,9 @@
   }
 
   // ===== تصدير CSV (يفتح في إكسل) =====
-  exportBtn.addEventListener('click', () => {
-    const dataToExport = state.filtered.length > 0 ? state.filtered : state.all;
-    if (dataToExport.length === 0) {
-      alert('لا توجد بيانات للتصدير');
-      return;
-    }
 
+  // يبني ملف CSV وينزّله من مصفوفة ردود
+  function downloadCsv(dataToExport, suffix) {
     const headers = ['التاريخ', 'الجهة', 'المسمى الوظيفي', 'سنوات الخبرة'];
     SECTIONS.forEach(sec => sec.items.forEach(label => headers.push(`[${sec.title}] ${label}`)));
     headers.push('أبرز نقطة إيجابية', 'أهم فرصة تحسين', 'المتوسط العام');
@@ -608,15 +617,345 @@
       .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       .join('\n');
 
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    triggerDownload(
+      new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }),
+      `survey-responses${suffix ? '-' + suffix : ''}-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  }
+
+  // ينزّل أي Blob باسم محدّد
+  function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `survey-responses-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  // ===== تصدير ملف إكسل منسّق (.xlsx) =====
+  // ألوان متوافقة مع هوية الموقع (صيغة AARRGGBB)
+  const XL = {
+    teal:      'FF00AA80',
+    teal700:   'FF007A5C',
+    orange:    'FFF59C00',
+    white:     'FFFFFFFF',
+    ink:       'FF0F1C1A',
+    line:      'FFD9E2E0',
+    titleBg:   'FF00AA80',
+    stripe:    'FFF5FBF9',
+    // تدرّجات فاتحة لرؤوس عبارات كل قسم
+    sectionTint: ['FFE8F5EE', 'FFFFF3E0', 'FFFFFBE5'],
+    // ألوان خلايا الدرجات حسب القيمة
+    high: { fg: 'FFE6F4EA', tx: 'FF1E7A46' },
+    mid:  { fg: 'FFFFF7E0', tx: 'FF8A6D00' },
+    low:  { fg: 'FFFDEAEA', tx: 'FFB42318' }
+  };
+
+  function downloadXlsx(dataToExport, suffix) {
+    const XLSX = window.XLSX;
+    if (!XLSX) { alert('تعذّر تحميل مكتبة إكسل، سيتم التصدير كـ CSV.'); downloadCsv(dataToExport, suffix); return; }
+
+    const FIXED    = ['التاريخ', 'الجهة', 'المسمى الوظيفي', 'سنوات الخبرة'];
+    const TRAILING = ['أبرز نقطة إيجابية', 'أهم فرصة تحسين', 'المتوسط العام'];
+
+    // أعمدة العبارات مع قسمها
+    const itemCols = [];
+    SECTIONS.forEach((sec, si) => sec.items.forEach((label, ii) =>
+      itemCols.push({ si, col: sec.cols[ii], label })));
+
+    const firstItem     = FIXED.length;
+    const firstTrailing = FIXED.length + itemCols.length;
+    const totalCols     = firstTrailing + TRAILING.length;
+    const lastCol       = totalCols - 1;
+
+    // ---- بناء صفوف البيانات (AOA) ----
+    const blank = () => new Array(totalCols).fill('');
+
+    const titleRow = blank();
+    titleRow[0] = `ردود الاستبيان — ${new Date().toLocaleDateString('ar-SA')} (${dataToExport.length} ردّ)`;
+
+    const groupRow = blank();
+    FIXED.forEach((h, i) => { groupRow[i] = h; });
+    let cur = firstItem;
+    SECTIONS.forEach(sec => { groupRow[cur] = sec.title; cur += sec.items.length; });
+    TRAILING.forEach((h, i) => { groupRow[firstTrailing + i] = h; });
+
+    const itemRow = blank();
+    itemCols.forEach((ic, k) => { itemRow[firstItem + k] = ic.label; });
+
+    const aoa = [titleRow, groupRow, itemRow];
+    dataToExport.forEach(r => {
+      const row = blank();
+      row[0] = new Date(r.created_at).toLocaleString('ar-SA');
+      row[1] = r.organization || '';
+      row[2] = r.job_title || '';
+      row[3] = r.years_experience || '';
+      itemCols.forEach((ic, k) => {
+        const v = r[ic.col];
+        row[firstItem + k] = (typeof v === 'number') ? v : (v ?? '');
+      });
+      row[firstTrailing]     = r.positive_point || '';
+      row[firstTrailing + 1] = r.improvement_opportunity || '';
+      const avg = rowAvg(r);
+      row[firstTrailing + 2] = (avg === null) ? '' : Number(avg.toFixed(2));
+      aoa.push(row);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // ---- الدمج ----
+    const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }]; // العنوان
+    for (let c = 0; c < FIXED.length; c++) merges.push({ s: { r: 1, c }, e: { r: 2, c } });
+    let mc = firstItem;
+    SECTIONS.forEach(sec => {
+      merges.push({ s: { r: 1, c: mc }, e: { r: 1, c: mc + sec.items.length - 1 } });
+      mc += sec.items.length;
+    });
+    for (let i = 0; i < TRAILING.length; i++) {
+      const c = firstTrailing + i;
+      merges.push({ s: { r: 1, c }, e: { r: 2, c } });
+    }
+    ws['!merges'] = merges;
+
+    // ---- أدوات التنسيق ----
+    const BORDER = { style: 'thin', color: { rgb: XL.line } };
+    const allBorders = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
+    const styleCell = (r, c, s) => {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+      ws[ref].s = s;
+    };
+
+    const titleStyle = {
+      font: { bold: true, sz: 15, color: { rgb: XL.white } },
+      fill: { fgColor: { rgb: XL.titleBg } },
+      alignment: { horizontal: 'center', vertical: 'center' }
+    };
+    const headStyle = (bg) => ({
+      font: { bold: true, sz: 11, color: { rgb: XL.white } },
+      fill: { fgColor: { rgb: bg } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: allBorders
+    });
+    const itemHeadStyle = (bg) => ({
+      font: { bold: true, sz: 9, color: { rgb: XL.ink } },
+      fill: { fgColor: { rgb: bg } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: allBorders
+    });
+    const dataStyle = (rowIdx, opts) => ({
+      font: { sz: 10, color: { rgb: (opts && opts.tx) || XL.ink }, bold: !!(opts && opts.bold) },
+      fill: { fgColor: { rgb: (opts && opts.fg) || (rowIdx % 2 ? XL.stripe : XL.white) } },
+      alignment: {
+        horizontal: (opts && opts.align) || 'right',
+        vertical: 'center',
+        wrapText: !!(opts && opts.wrap)
+      },
+      border: allBorders,
+      numFmt: (opts && opts.numFmt) || undefined
+    });
+
+    const ratingColor = (v) => {
+      if (typeof v !== 'number') return null;
+      if (v >= 4) return XL.high;
+      if (v >= 3) return XL.mid;
+      return XL.low;
+    };
+
+    // ---- تطبيق التنسيق ----
+    for (let c = 0; c <= lastCol; c++) styleCell(0, c, titleStyle); // العنوان
+
+    // صف المجموعات + صف العبارات
+    for (let c = 0; c < FIXED.length; c++) { styleCell(1, c, headStyle(XL.teal)); styleCell(2, c, headStyle(XL.teal)); }
+    itemCols.forEach((ic, k) => {
+      const c = firstItem + k;
+      styleCell(1, c, headStyle(XL.teal700)); // عنوان القسم
+      styleCell(2, c, itemHeadStyle(XL.sectionTint[ic.si] || XL.sectionTint[0]));
+    });
+    for (let i = 0; i < TRAILING.length; i++) {
+      const c = firstTrailing + i;
+      styleCell(1, c, headStyle(XL.orange));
+      styleCell(2, c, headStyle(XL.orange));
+    }
+
+    // صفوف البيانات
+    dataToExport.forEach((r, di) => {
+      const R = 3 + di;
+      styleCell(R, 0, dataStyle(di));                         // التاريخ
+      styleCell(R, 1, dataStyle(di, { bold: true }));         // الجهة
+      styleCell(R, 2, dataStyle(di));                         // المسمى
+      styleCell(R, 3, dataStyle(di, { align: 'center' }));    // سنوات الخبرة
+      itemCols.forEach((ic, k) => {
+        const v = r[ic.col];
+        const col = ratingColor(typeof v === 'number' ? v : null);
+        styleCell(R, firstItem + k, dataStyle(di, {
+          align: 'center', bold: true,
+          fg: col ? col.fg : undefined, tx: col ? col.tx : undefined
+        }));
+      });
+      styleCell(R, firstTrailing,     dataStyle(di, { wrap: true }));
+      styleCell(R, firstTrailing + 1, dataStyle(di, { wrap: true }));
+      const avg = rowAvg(r);
+      const acol = ratingColor(avg);
+      styleCell(R, firstTrailing + 2, dataStyle(di, {
+        align: 'center', bold: true, numFmt: '0.00',
+        fg: acol ? acol.fg : undefined, tx: acol ? acol.tx : undefined
+      }));
+    });
+
+    // ---- عرض الأعمدة وارتفاع الصفوف ----
+    const cols = [{ wch: 20 }, { wch: 28 }, { wch: 22 }, { wch: 12 }];
+    itemCols.forEach(() => cols.push({ wch: 13 }));
+    cols.push({ wch: 34 }, { wch: 34 }, { wch: 11 });
+    ws['!cols'] = cols;
+
+    ws['!rows'] = [{ hpt: 26 }, { hpt: 22 }, { hpt: 64 }];
+
+    // ---- إنشاء المصنّف بصيغة RTL وتنزيله ----
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'الردود');
+    wb.Workbook = { Views: [{ RTL: true }] };
+
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    triggerDownload(
+      new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+      `survey-responses${suffix ? '-' + suffix : ''}-${new Date().toISOString().split('T')[0]}.xlsx`
+    );
+  }
+
+  // يعيد رسم قائمة الجهات داخل النافذة (مع فلترة البحث، مع الحفاظ على التحديد)
+  function renderExportOrgs() {
+    const orgs = Array.from(new Set(state.all.map(d => d.organization).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'ar'));
+    const q = (exportOrgsSearch.value || '').trim().toLowerCase();
+    const visible = q ? orgs.filter(o => o.toLowerCase().includes(q)) : orgs;
+
+    if (visible.length === 0) {
+      exportOrgsList.innerHTML = '<div class="export-orgs__empty">لا توجد جهات مطابقة</div>';
+      return;
+    }
+
+    exportOrgsList.innerHTML = visible.map(org => {
+      const checked = exportSelectedOrgs.has(org) ? 'checked' : '';
+      return `<label class="export-orgs__item">
+        <input type="checkbox" value="${escapeHtml(org)}" ${checked}>
+        <span class="export-orgs__box" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span class="export-orgs__item-name">${escapeHtml(org)}</span>
+      </label>`;
+    }).join('');
+  }
+
+  // يحدّث عدّاد التحديد وحالة زر التأكيد
+  function updateExportCount() {
+    const scope = exportModal.querySelector('input[name="export-scope"]:checked').value;
+    if (scope === 'all') {
+      exportOrgsCount.textContent = '';
+      exportConfirmBtn.disabled = false;
+      return;
+    }
+    const n = exportSelectedOrgs.size;
+    exportOrgsCount.textContent = n === 0
+      ? 'لم يتم تحديد أي جهة'
+      : `تم تحديد ${n} ${n === 1 ? 'جهة' : 'جهات'}`;
+    exportConfirmBtn.disabled = n === 0;
+  }
+
+  // مجموعة الجهات المحددة في نافذة التصدير
+  const exportSelectedOrgs = new Set();
+
+  function openExportModal() {
+    if (state.all.length === 0) {
+      alert('لا توجد بيانات للتصدير');
+      return;
+    }
+    // إعادة الضبط للحالة الافتراضية: كل الجهات
+    exportModal.querySelector('input[name="export-scope"][value="all"]').checked = true;
+    exportSelectedOrgs.clear();
+    exportOrgsSearch.value = '';
+    exportOrgsWrap.hidden = true;
+    renderExportOrgs();
+    updateExportCount();
+    exportModal.classList.add('is-open');
+    exportModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeExportModal() {
+    exportModal.classList.remove('is-open');
+    exportModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  exportBtn.addEventListener('click', openExportModal);
+  exportModalBackdrop.addEventListener('click', closeExportModal);
+  exportModalClose.addEventListener('click', closeExportModal);
+  exportCancelBtn.addEventListener('click', closeExportModal);
+
+  // تبديل ظهور قائمة الجهات حسب النطاق
+  exportModal.querySelectorAll('input[name="export-scope"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const scope = radio.value;
+      exportOrgsWrap.hidden = scope !== 'selected';
+      updateExportCount();
+    });
+  });
+
+  // تحديد/إلغاء جهة
+  exportOrgsList.addEventListener('change', (e) => {
+    const cb = e.target.closest('input[type="checkbox"]');
+    if (!cb) return;
+    if (cb.checked) exportSelectedOrgs.add(cb.value);
+    else exportSelectedOrgs.delete(cb.value);
+    updateExportCount();
+  });
+
+  exportOrgsSearch.addEventListener('input', renderExportOrgs);
+
+  exportOrgsAllBtn.addEventListener('click', () => {
+    exportOrgsList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.checked = true;
+      exportSelectedOrgs.add(cb.value);
+    });
+    updateExportCount();
+  });
+
+  exportOrgsNoneBtn.addEventListener('click', () => {
+    exportOrgsList.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    exportSelectedOrgs.clear();
+    updateExportCount();
+  });
+
+  exportConfirmBtn.addEventListener('click', () => {
+    const scope = exportModal.querySelector('input[name="export-scope"]:checked').value;
+    let dataToExport, suffix = '';
+
+    if (scope === 'selected') {
+      if (exportSelectedOrgs.size === 0) return;
+      dataToExport = state.all.filter(r => exportSelectedOrgs.has(r.organization));
+      suffix = exportSelectedOrgs.size === 1
+        ? Array.from(exportSelectedOrgs)[0].replace(/[\\/:*?"<>|]/g, '_').slice(0, 40)
+        : `${exportSelectedOrgs.size}-جهات`;
+    } else {
+      dataToExport = state.all;
+    }
+
+    if (dataToExport.length === 0) {
+      alert('لا توجد بيانات للتصدير');
+      return;
+    }
+
+    downloadXlsx(dataToExport, suffix);
+    closeExportModal();
+  });
+
+  // إغلاق النافذة بمفتاح Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && exportModal.classList.contains('is-open')) closeExportModal();
   });
 
   // ===== أداة هروب HTML =====
